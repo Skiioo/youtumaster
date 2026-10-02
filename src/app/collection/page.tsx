@@ -6,8 +6,10 @@ export default async function CollectionPage({ searchParams }: PageProps<"/colle
   const { sort } = await searchParams;
   const byRecent = sort === "recent";
   const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
 
-  let query = supabase.from("cards").select(CARD_SELECT);
+  // owner_id obligatoire : la RLS laisse aussi voir les cartes des autres mises en vente
+  let query = supabase.from("cards").select(CARD_SELECT).eq("owner_id", user?.id ?? "");
   query = byRecent
     ? query.order("obtained_at", { ascending: false })
     : query.order("rarity", { ascending: false }).order("attack", { ascending: false });

@@ -1,6 +1,8 @@
 // Remplit le catalogue `videos`.
 // Usage : pnpm harvest @chaine UCxxx [--max-pages=N]   -> chaînes choisies
 //         pnpm harvest --discover [--budget=N]          -> mode automatique (quotidien)
+//         pnpm harvest --clean [--budget=N]             -> retire les vidéos verticales déjà en base
+// Seules les vidéos horizontales ou carrées entrent dans le catalogue (pas de vertical).
 // Le mode --discover trouve de nouvelles chaînes via les tendances de chaque pays, puis
 // remet à jour les chaînes vieilles de 25 jours+ (règle des 30 jours de la plateforme).
 // Coût quota : 1 unité par appel (jamais de recherche à 100), plafonné par --budget.
@@ -22,6 +24,8 @@ async function api(path: string, params: Record<string, string>) {
   units++;
   const res = await fetch(`${API}/${path}?${new URLSearchParams({ ...params, key: KEY })}`);
   const json = await res.json();
+  // Quota du jour épuisé côté plateforme : arrêt propre, comme le budget local
+  if (json.error?.errors?.some((e: { reason: string }) => e.reason === "quotaExceeded")) throw new BudgetExceeded();
   if (!res.ok) throw new Error(`${path}: ${json.error?.message ?? res.status}`);
   return json;
 }
@@ -35,7 +39,13 @@ type ApiVideo = {
   id: string;
   snippet: { title: string; publishedAt: string; categoryId: string };
   statistics: { viewCount?: string; likeCount?: string };
+  player: { embedWidth?: string; embedHeight?: string };
 };
+
+// `player` + maxWidth renvoie les dimensions du lecteur, donc le format (sans coût de quota en plus)
+const PLAYER = { maxWidth: "1000" };
+const notVertical = (v: Pick<ApiVideo, "player">) =>
+  Number(v.player.embedWidth) >= Number(v.player.embedHeight);
 
 async function harvestChannel(channel: string, maxPages: number) {
   const ch = (
@@ -81,7 +91,8 @@ async function harvestChannel(channel: string, maxPages: number) {
     const ids: string[] = list.items.map((i: { contentDetails: { videoId: string } }) => i.contentDetails.videoId);
     if (ids.length === 0) break;
 
-    const videos: ApiVideo[] = (await api("videos", { part: "snippet,statistics", id: ids.join(",") })).items;
+    const all: ApiVideo[] = (await api("videos", { part: "snippet,statistics,player", ...PLAYER, id: ids.join(",") })).items;
+    const videos = all.filter(notVertical);
     const whitelisted = new Set(
       check(await db.from("goat_whitelist").select("platform_video_id").in("platform_video_id", ids)).map(
         (w) => w.platform_video_id,
@@ -108,8 +119,10 @@ async function harvestChannel(channel: string, maxPages: number) {
         }).rarity,
       };
     });
-    const { error } = await db.from("videos").upsert(rows, { onConflict: "platform_video_id" });
-    if (error) throw new Error(error.message);
+    if (rows.length > 0) {
+      const { error } = await db.from("videos").upsert(rows, { onConflict: "platform_video_id" });
+      if (error) throw new Error(error.message);
+    }
 
     total += rows.length;
     pageToken = list.nextPageToken;
@@ -161,6 +174,35 @@ async function discoverChannels(): Promise<string[]> {
   return [...stale, ...fresh];
 }
 
+// Les vidéos déjà tirées en carte ne peuvent pas être supprimées : on les retire juste des boosters
+async function cleanVertical() {
+  let removed = 0; // dans la page courante
+  let total = 0;
+  let checked = 0;
+  for (let from = 0; ; from += 1000) {
+    const page = check(
+      await db.from("videos").select("platform_video_id").eq("is_available", true).order("id").range(from, from + 999),
+    );
+    for (let i = 0; i < page.length; i += 50) {
+      const ids = page.slice(i, i + 50).map((v) => v.platform_video_id);
+      const items: ApiVideo[] = (await api("videos", { part: "player", ...PLAYER, id: ids.join(",") })).items;
+      const keep = new Set(items.filter(notVertical).map((v) => v.id));
+      const drop = ids.filter((id) => !keep.has(id)); // inclut les vidéos supprimées/privées
+      if (drop.length > 0) {
+        const { error } = await db.from("videos").update({ is_available: false }).in("platform_video_id", drop);
+        if (error) throw new Error(error.message);
+      }
+      removed += drop.length;
+      total += drop.length;
+      checked += ids.length;
+    }
+    if (page.length < 1000) break;
+    from -= removed; // les vidéos retirées sortent du filtre is_available : on ne saute pas de page
+    removed = 0;
+  }
+  console.log(`🧹 ${checked} vidéos vérifiées, ${total} retirées des boosters`);
+}
+
 const args = process.argv.slice(2);
 const flag = (name: string) => args.find((a) => a.startsWith(`--${name}=`))?.split("=")[1];
 const discover = args.includes("--discover");
@@ -168,6 +210,17 @@ budget = Number(flag("budget") ?? 9000); // marge sous les 10 000/jour pour les 
 // ponytail: 20 pages = 1000 vidéos les plus récentes par chaîne en mode auto ; les vieux hits des
 // très grosses chaînes manquent, ajouter un passage `--max-pages` ciblé si besoin
 const maxPages = Number(flag("max-pages") ?? (discover ? 20 : Infinity));
+if (args.includes("--clean")) {
+  budget = Number(flag("budget") ?? 9000);
+  try {
+    await cleanVertical();
+  } catch (e) {
+    if (!(e instanceof BudgetExceeded)) throw e;
+    console.log("⏸️  Quota atteint, relance --clean plus tard pour continuer.");
+  }
+  console.log(`Quota utilisé : ${units} unités`);
+  process.exit(0);
+}
 const channels = discover ? await discoverChannels() : args.filter((a) => !a.startsWith("--"));
 if (channels.length === 0 && !discover) {
   console.error("Usage : pnpm harvest @chaine [UCxxx...] [--max-pages=N]  |  pnpm harvest --discover [--budget=N]");
@@ -178,7 +231,7 @@ for (const c of channels) {
     await harvestChannel(c, maxPages);
   } catch (e) {
     if (e instanceof BudgetExceeded) {
-      console.log("⏸️  Budget de quota atteint, la suite au prochain passage.");
+      console.log("⏸️  Quota atteint, la suite au prochain passage.");
       break;
     }
     console.error(`❌ ${c} : ${(e as Error).message}`);
