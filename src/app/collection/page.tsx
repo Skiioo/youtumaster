@@ -12,13 +12,18 @@ export default async function CollectionPage({ searchParams }: PageProps<"/colle
     ? query.order("obtained_at", { ascending: false })
     : query.order("rarity", { ascending: false }).order("attack", { ascending: false });
   // ponytail: plafond fixe, paginer quand une collection dépassera 500 cartes
-  const { data: cards } = await query.limit(500).returns<CardData[]>();
+  const { data } = await query.limit(500).returns<CardData[]>();
+  // Tri par faction en JS : PostgREST ne trie pas une table par la colonne d'une table jointe
+  const cards = sort === "faction"
+    ? data?.toSorted((a, b) => (a.videos.factions?.id ?? 99) - (b.videos.factions?.id ?? 99))
+    : data;
 
   return (
     <main style={{ padding: 24 }}>
       <h1>Ma collection ({cards?.length ?? 0})</h1>
       <p>
-        Trier : <Link href="/collection">rareté</Link> · <Link href="/collection?sort=recent">plus récentes</Link>
+        Trier : <Link href="/collection">rareté</Link> · <Link href="/collection?sort=faction">faction</Link> ·{" "}
+        <Link href="/collection?sort=recent">plus récentes</Link>
       </p>
       <ul className="card-grid">
         {cards?.map((c) => (

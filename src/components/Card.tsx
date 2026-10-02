@@ -1,5 +1,5 @@
 export const CARD_SELECT =
-  "id, rarity, variant, attack, defense, snap_view_count, videos(platform_video_id, title)";
+  "id, rarity, variant, attack, defense, snap_view_count, videos(platform_video_id, title, factions(id, name))";
 
 export type CardData = {
   id: string;
@@ -8,7 +8,7 @@ export type CardData = {
   attack: number;
   defense: number;
   snap_view_count: number;
-  videos: { platform_video_id: string; title: string };
+  videos: { platform_video_id: string; title: string; factions: { id: number; name: string } | null };
 };
 
 const media = (template: string | undefined, id: string) => template!.replace("{id}", id);
@@ -38,6 +38,7 @@ export function Card({ card, big = false }: { card: CardData; big?: boolean }) {
         {card.rarity.toUpperCase()}
         {card.variant !== "normal" && ` · ${card.variant}`}
       </strong>
+      {card.videos.factions && <small> · {card.videos.factions.name}</small>}
       <p style={{ margin: "4px 0" }}>{card.videos.title}</p>
       <small>
         ⚔️ {card.attack} · 🛡️ {card.defense} · 👁️ {card.snap_view_count.toLocaleString("fr-FR")}
