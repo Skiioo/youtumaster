@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { thumbnailUrl } from "@/components/Card";
+import { CARD_SIZE, RARITY_BG, thumbnailUrl } from "@/components/Card";
+import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
 import { DeckPicker } from "@/components/DeckPicker";
 import { createClient } from "@/lib/supabase/server";
 import { answerQuiz, attack, cancelMatch, joinMatch } from "../actions";
@@ -36,13 +38,25 @@ function Team({ title, cards, factions }: {
       <h2>{title}</h2>
       <ul className="card-grid">
         {cards.map(([id, c]) => (
-          <li key={id} style={{ opacity: c.hp > 0 ? 1 : 0.35 }}>
+          <li
+            key={id}
+            className={cn(
+              "flex flex-col gap-2 overflow-hidden rounded-xl p-2 text-zinc-900 ring-1 ring-foreground/10",
+              CARD_SIZE,
+              RARITY_BG[c.rarity] ?? RARITY_BG.common,
+              c.hp <= 0 && "opacity-35 grayscale",
+            )}
+          >
             {/* eslint-disable-next-line @next/next/no-img-element -- miniature externe */}
-            <img src={thumbnailUrl(c.video)} alt={c.title} style={{ width: "100%", borderRadius: 4 }} />
-            <strong>{c.rarity.toUpperCase()}</strong> · {factions.get(c.faction ?? 0) ?? "?"}
-            <p style={{ margin: "4px 0" }}>{c.title}</p>
-            <meter min={0} max={c.max_hp} value={c.hp} style={{ width: "100%" }} />
-            <small>❤️ {c.hp}/{c.max_hp} · ⚔️ {c.attack}</small>
+            <img src={thumbnailUrl(c.video)} alt={c.title} className="aspect-video w-full rounded-md object-cover" />
+            <div className="flex flex-wrap gap-1">
+              <Badge variant="outline" className="border-zinc-900/20 text-zinc-900">{factions.get(c.faction ?? 0) ?? "?"}</Badge>
+            </div>
+            <p className="line-clamp-2 text-sm font-medium">{c.title}</p>
+            <div className="mt-auto grid gap-1">
+              <meter min={0} max={c.max_hp} value={c.hp} className="w-full" />
+              <small className="text-zinc-700">❤️ {c.hp}/{c.max_hp} · ⚔️ {c.attack}</small>
+            </div>
           </li>
         ))}
       </ul>

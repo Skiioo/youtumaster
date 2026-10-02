@@ -36,7 +36,6 @@ export default async function CollectionPage({ searchParams }: PageProps<"/colle
           </li>
         ))}
       </ul>
-      <Link href="/">← Retour</Link>
     </main>
   );
 }

@@ -6,8 +6,8 @@
 
 .card-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-  gap: 16px;
+  grid-template-columns: repeat(auto-fill, 14rem); /* = largeur d'une carte (w-56) */
+  gap: 2rem;
   list-style: none;
   padding: 0;
 }
@@ -136,6 +136,8 @@
   }
   /* Style shadcn pour les éléments HTML natifs des pages (les composants ui/* ont un data-slot) */
   h1 { @apply text-2xl font-bold tracking-tight; }
+  /* Espace entre le titre d'une page et son contenu (les pages Paquet l'annulent) */
+  main > h1 { @apply mb-6; }
   h2 { @apply text-lg font-semibold; }
   main a:not([data-slot]) { @apply font-medium underline-offset-4 hover:underline; }
   button:not([data-slot]) {
@@ -149,4 +151,12 @@
       focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50;
   }
   textarea:not([data-slot]) { @apply h-auto py-1.5; }
+}
+/* Retournement d'une carte de booster (dos -> face) */
+@theme {
+  --animate-flip-in: flip-in 0.7s ease-out forwards;
+  @keyframes flip-in {
+    from { transform: rotateY(0deg); }
+    to { transform: rotateY(180deg); }
+  }
 }

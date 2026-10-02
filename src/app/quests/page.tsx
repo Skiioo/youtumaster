@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { setActiveTitle } from "./actions";
 
@@ -44,7 +43,6 @@ export default async function QuestsPage({ searchParams }: PageProps<"/quests">)
           <button>Afficher</button>
         </form>
       )}
-      <p><Link href="/">← Retour</Link></p>
     </main>
   );
 }

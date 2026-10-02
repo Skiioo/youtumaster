@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
@@ -26,7 +25,7 @@ export default async function AdminPage({ searchParams }: PageProps<"/admin">) {
       {msg && <p role="status">{msg}</p>}
 
       <section style={box}>
-        <h2>Whitelist GOAT</h2>
+        <h2>Whitelist YAOT</h2>
         <form action={addGoat} style={{ display: "grid", gap: 8 }}>
           <input name="video" placeholder="Lien ou ID de la vidéo" required />
           <input name="reason" placeholder="Pourquoi elle est culte" required />
@@ -77,7 +76,6 @@ export default async function AdminPage({ searchParams }: PageProps<"/admin">) {
           ))}
         </ul>
       </section>
-      <Link href="/">← Retour</Link>
     </main>
   );
 }

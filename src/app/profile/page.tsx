@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import { isPatron } from "@/lib/players";
 import { createClient } from "@/lib/supabase/server";
 import { equipCosmetics } from "./actions";
@@ -21,6 +21,11 @@ export default async function ProfilePage({ searchParams }: PageProps<"/profile"
   return (
     <main style={{ padding: 24, display: "grid", gap: 16, maxWidth: 600 }}>
       <h1>Profil de {me?.username}</h1>
+
+      <section className="grid gap-2">
+        <h2>Paramètres</h2>
+        <ThemeToggle />
+      </section>
       {isPatron(me) ? (
         <form action={equipCosmetics} style={{ display: "grid", gap: 8 }}>
           <p>Merci pour ton soutien 💜 Choisis tes cosmétiques :</p>
@@ -42,7 +47,6 @@ export default async function ProfilePage({ searchParams }: PageProps<"/profile"
           (badge, couleur de pseudo, dos de carte), sans aucun avantage en jeu.
         </p>
       )}
-      <Link href="/">← Retour</Link>
     </main>
   );
 }

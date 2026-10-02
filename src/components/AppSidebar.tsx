@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Coins, House, Layers, LogOut, ScrollText, Shield, Store, Swords, User } from "lucide-react";
+import { Layers, LogOut, PlayingCardsFan, ScrollText, Shield, Store, Swords, User } from "lucide-react";
 import { logout } from "@/app/auth/actions";
 import {
   Sidebar,
@@ -17,7 +17,7 @@ import {
 } from "@/components/ui/sidebar";
 
 const NAV = [
-  { href: "/", label: "Accueil", icon: House, match: ["/booster"] },
+  { href: "/", label: "Paquet", icon: PlayingCardsFan, match: ["/booster"] },
   { href: "/collection", label: "Collection", icon: Layers, match: ["/card"] },
   { href: "/market", label: "Marché", icon: Store, match: [] },
   { href: "/play", label: "Combat", icon: Swords, match: ["/match"] },
@@ -25,7 +25,10 @@ const NAV = [
   { href: "/profile", label: "Profil", icon: User, match: [] },
 ];
 
-export function AppSidebar({ username, viewcoins, isAdmin }: { username: string; viewcoins: number; isAdmin: boolean }) {
+/** Boutons de menu plus grands que le défaut shadcn */
+const ITEM = "h-11 gap-3 px-3 text-base [&_svg]:size-5";
+
+export function AppSidebar({ isAdmin }: { isAdmin: boolean }) {
   const pathname = usePathname();
   const items = isAdmin ? [...NAV, { href: "/admin", label: "Admin", icon: Shield, match: [] }] : NAV;
   const isActive = (href: string, match: string[]) =>
@@ -33,24 +36,19 @@ export function AppSidebar({ username, viewcoins, isAdmin }: { username: string;
 
   return (
     <Sidebar collapsible="icon">
-      <SidebarHeader>
-        <SidebarMenu>
-          <SidebarMenuItem>
-            <SidebarMenuButton size="lg" render={<Link href="/" />}>
-              <span className="text-xl">🃏</span>
-              <span className="font-semibold">ViewCards</span>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-        </SidebarMenu>
+      <SidebarHeader className="p-4">
+        <Link href="/" className="px-3 py-2 text-xl font-bold">
+          YoutuMaster
+        </Link>
       </SidebarHeader>
 
-      <SidebarContent>
+      <SidebarContent className="px-2">
         <SidebarGroup>
           <SidebarGroupContent>
-            <SidebarMenu>
+            <SidebarMenu className="gap-1.5">
               {items.map(({ href, label, icon: Icon, match }) => (
                 <SidebarMenuItem key={href}>
-                  <SidebarMenuButton isActive={isActive(href, match)} tooltip={label} render={<Link href={href} />}>
+                  <SidebarMenuButton className={ITEM} isActive={isActive(href, match)} tooltip={label} render={<Link href={href} />}>
                     <Icon />
                     <span>{label}</span>
                   </SidebarMenuButton>
@@ -61,19 +59,11 @@ export function AppSidebar({ username, viewcoins, isAdmin }: { username: string;
         </SidebarGroup>
       </SidebarContent>
 
-      <SidebarFooter>
+      <SidebarFooter className="p-4">
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton tooltip={`${viewcoins} ViewCoins`} render={<Link href="/profile" />}>
-              <Coins />
-              <span className="truncate">
-                {username} · {viewcoins.toLocaleString("fr-FR")}
-              </span>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-          <SidebarMenuItem>
             <form action={logout}>
-              <SidebarMenuButton type="submit" tooltip="Se déconnecter">
+              <SidebarMenuButton className={ITEM} type="submit" tooltip="Se déconnecter">
                 <LogOut />
                 <span>Se déconnecter</span>
               </SidebarMenuButton>

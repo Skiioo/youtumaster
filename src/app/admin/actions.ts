@@ -25,7 +25,7 @@ export async function addGoat(formData: FormData) {
   if (error) done(`Erreur : ${error.message}`);
   // La vidéo peut sortir en GOAT dans les boosters ; les cartes existantes passent GOAT via un Jeton de Refresh
   await db.from("videos").update({ current_rarity: "goat" }).eq("platform_video_id", id);
-  done(`${id} ajoutée à la whitelist GOAT.`);
+  done(`${id} ajoutée à la whitelist YAOT.`);
 }
 
 export async function removeGoat(formData: FormData) {
@@ -33,7 +33,7 @@ export async function removeGoat(formData: FormData) {
   const id = String(formData.get("video"));
   await db.from("goat_whitelist").delete().eq("platform_video_id", id);
   await updateVideosFromApi([id]); // recalcule sa rareté normale
-  done(`${id} retirée de la whitelist GOAT.`);
+  done(`${id} retirée de la whitelist YAOT.`);
 }
 
 export async function createAlbum(formData: FormData) {

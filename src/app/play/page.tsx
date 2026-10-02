@@ -50,7 +50,6 @@ export default async function PlayPage({ searchParams }: PageProps<"/play">) {
 
       <h2>Créer un défi</h2>
       <DeckPicker action={createMatch} label="Créer le défi" />
-      <Link href="/">← Retour</Link>
     </main>
   );
 }

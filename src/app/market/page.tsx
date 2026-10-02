@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { Card, CARD_SELECT, type CardData } from "@/components/Card";
 import { createClient } from "@/lib/supabase/server";
 import { placeBid } from "./actions";
@@ -54,7 +53,6 @@ export default async function MarketPage({ searchParams }: PageProps<"/market">)
           );
         })}
       </ul>
-      <Link href="/">← Retour</Link>
     </main>
   );
 }
