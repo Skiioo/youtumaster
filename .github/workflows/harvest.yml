@@ -1,0 +1,25 @@
+name: Catalogue vidéo
+
+on:
+  schedule:
+    - cron: "0 9 * * *" # chaque jour, après la remise à zéro du quota
+  workflow_dispatch: # bouton "Run workflow" pour lancer à la main
+
+jobs:
+  harvest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm harvest --discover
+        env:
+          VIDEO_API_KEY: ${{ secrets.VIDEO_API_KEY }}
+          VIDEO_API_BASE_URL: ${{ secrets.VIDEO_API_BASE_URL }}
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}

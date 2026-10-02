@@ -32,7 +32,7 @@ CREATE TABLE game_config (
 
 INSERT INTO game_config (key, value) VALUES
   ('booster_interval_seconds', '120'),
-  ('booster_stock_cap',        '5'),
+  ('booster_stock_cap',        '10'),
   ('booster_size',             '5'),
   ('refresh_token_drop_rate',  '0.05'),
   ('combat_stale_after_hours', '168'),       -- 1 semaine
@@ -74,7 +74,7 @@ CREATE TABLE users (
 
   -- Boosters : calcul paresseux, pas de cron.
   -- dispo = min(cap, booster_stock + floor((now - booster_anchor_at) / interval))
-  booster_stock      smallint NOT NULL DEFAULT 0,
+  booster_stock      smallint NOT NULL DEFAULT 10,  -- boosters offerts à l'inscription
   booster_anchor_at  timestamptz NOT NULL DEFAULT now(),
   boosters_opened    integer NOT NULL DEFAULT 0,   -- déverrouillage du marché
 
