@@ -4,9 +4,20 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* Lien autour d'une carte : pas de soulignement, la carte grossit légèrement au survol */
+.card-link {
+  display: block;
+  transition: transform 200ms ease;
+}
+.card-link:hover,
+.card-link:focus-visible {
+  transform: scale(1.05);
+}
+
 .card-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, 14rem); /* = largeur d'une carte (w-56) */
+  /* --card-w = largeur d'une carte : 14rem (w-56) par défaut, 12rem (w-48) pour les cartes réduites */
+  grid-template-columns: repeat(auto-fill, var(--card-w, 14rem));
   gap: 2rem;
   list-style: none;
   padding: 0;
@@ -73,7 +84,7 @@
   --destructive: oklch(0.577 0.245 27.325);
   --border: oklch(0.922 0 0);
   --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
+  --ring: oklch(0.704 0.191 22.216); /* accent d'interaction : rouge clair (red-400) */
   --chart-1: oklch(0.87 0 0);
   --chart-2: oklch(0.556 0 0);
   --chart-3: oklch(0.439 0 0);
@@ -87,7 +98,7 @@
   --sidebar-accent: oklch(0.97 0 0);
   --sidebar-accent-foreground: oklch(0.205 0 0);
   --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+  --sidebar-ring: oklch(0.704 0.191 22.216);
 }
 
 .dark {
@@ -108,7 +119,7 @@
   --destructive: oklch(0.704 0.191 22.216);
   --border: oklch(1 0 0 / 10%);
   --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
+  --ring: oklch(0.704 0.191 22.216); /* accent d'interaction : rouge clair (red-400) */
   --chart-1: oklch(0.87 0 0);
   --chart-2: oklch(0.556 0 0);
   --chart-3: oklch(0.439 0 0);
@@ -121,7 +132,7 @@
   --sidebar-accent: oklch(0.269 0 0);
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
+  --sidebar-ring: oklch(0.704 0.191 22.216);
 }
 
 @layer base {
@@ -139,7 +150,7 @@
   /* Espace entre le titre d'une page et son contenu (les pages Paquet l'annulent) */
   main > h1 { @apply mb-6; }
   h2 { @apply text-lg font-semibold; }
-  main a:not([data-slot]) { @apply font-medium underline-offset-4 hover:underline; }
+  main a:not([data-slot]):not(.card-link) { @apply font-medium underline-offset-4 hover:underline; }
   button:not([data-slot]) {
     @apply inline-flex h-8 items-center justify-center gap-1.5 rounded-lg bg-primary px-3 text-sm font-medium
       text-primary-foreground transition-colors hover:bg-primary/85 disabled:pointer-events-none disabled:opacity-50;
@@ -151,6 +162,23 @@
       focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50;
   }
   textarea:not([data-slot]) { @apply h-auto py-1.5; }
+  /* Listes déroulantes natives : flèche du navigateur remplacée par un chevron gris,
+     placé à 12 px du bord droit (macOS colle la flèche native à la bordure) */
+  select:not([data-slot]) {
+    appearance: none;
+    padding-right: 2.25rem;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23737373' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 0.75rem center;
+    background-size: 1rem;
+  }
+  /* Accent d'interaction (= --ring, rouge clair) sur les éléments natifs */
+  input[type="checkbox"], input[type="radio"] { accent-color: var(--ring); }
+  button:not([data-slot]) { @apply outline-none focus-visible:ring-3 focus-visible:ring-ring/50; }
+  input:not([data-slot]):not([type="checkbox"]):not([type="radio"]):not([type="hidden"]),
+  select:not([data-slot]),
+  textarea:not([data-slot]) { @apply hover:border-ring/50; }
+  main a:not([data-slot]):not(.card-link) { @apply decoration-ring hover:text-ring; }
 }
 /* Retournement d'une carte de booster (dos -> face) */
 @theme {

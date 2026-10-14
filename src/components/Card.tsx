@@ -1,9 +1,10 @@
+import { Eye, Shield, Star, Sword } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card as UiCard, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 
 export const CARD_SELECT =
-  "id, rarity, variant, attack, defense, snap_view_count, videos(platform_video_id, title, last_sold_price, factions(id, name))";
+  "id, rarity, variant, attack, defense, snap_view_count, is_favorite, videos(platform_video_id, title, last_sold_price, factions(id, name), creators(name))";
 
 export type CardData = {
   id: string;
@@ -12,16 +13,20 @@ export type CardData = {
   attack: number;
   defense: number;
   snap_view_count: number;
+  is_favorite: boolean;
   videos: {
     platform_video_id: string;
     title: string;
     last_sold_price: number | null;
     factions: { id: number; name: string } | null;
+    creators: { name: string } | null;
   };
 };
 
-export const thumbnailUrl = (videoId: string) => process.env.NEXT_PUBLIC_THUMBNAIL_URL_TEMPLATE!.replace("{id}", videoId);
-export const videoUrl = (videoId: string) => process.env.NEXT_PUBLIC_VIDEO_URL_TEMPLATE!.replace("{id}", videoId);
+export const thumbnailUrl = (videoId: string) =>
+  process.env.NEXT_PUBLIC_THUMBNAIL_URL_TEMPLATE!.replace("{id}", videoId);
+export const videoUrl = (videoId: string) =>
+  process.env.NEXT_PUBLIC_VIDEO_URL_TEMPLATE!.replace("{id}", videoId);
 
 /** Fond de la carte : la rareté se lit à sa couleur */
 export const RARITY_BG: Record<string, string> = {
@@ -40,12 +45,18 @@ const RARITY_BADGE: Record<string, { label: string; className: string }> = {
   rare: { label: "Rare", className: "bg-sky-600 text-white" },
   epic: { label: "Epic", className: "bg-violet-600 text-white" },
   legendary: { label: "Légendaire", className: "bg-amber-500 text-black" },
-  goat: { label: "YAOT", className: "bg-linear-to-r from-red-500 via-yellow-400 to-blue-500 text-black" },
+  goat: {
+    label: "YOAT",
+    className:
+      "bg-linear-to-r from-red-500 via-yellow-400 to-blue-500 text-black",
+  },
 };
 
 /** Format d'une carte de jeu, identique au dos de carte du booster ; la vue détaillée garde ses proportions en plus grand. */
 export const CARD_SIZE = "h-80 w-56";
 const CARD_SIZE_BIG = "h-[28rem] w-80";
+/** Format réduit pour les grilles de la collection et du marché (même proportions) */
+const CARD_SIZE_SMALL = "h-[17rem] w-48";
 
 const VARIANT_RING: Record<string, string> = {
   gold: "ring-2 ring-amber-400",
@@ -54,11 +65,25 @@ const VARIANT_RING: Record<string, string> = {
 };
 
 /** Petite carte (grille) ou grande carte (vue détaillée, miniature cliquable vers la vidéo). */
-export function Card({ card, big = false, className }: { card: CardData; big?: boolean; className?: string }) {
+export function Card({
+  card,
+  big = false,
+  small = false,
+  className,
+}: {
+  card: CardData;
+  big?: boolean;
+  small?: boolean;
+  className?: string;
+}) {
   const videoId = card.videos.platform_video_id;
   const thumb = (
     // eslint-disable-next-line @next/next/no-img-element -- miniature externe, jamais hébergée chez nous
-    <img src={thumbnailUrl(videoId)} alt={card.videos.title} className="aspect-video w-full rounded-md object-cover" />
+    <img
+      src={thumbnailUrl(videoId)}
+      alt={card.videos.title}
+      className="aspect-video w-full rounded-md object-cover"
+    />
   );
 
   return (
@@ -66,14 +91,25 @@ export function Card({ card, big = false, className }: { card: CardData; big?: b
       className={cn(
         "gap-2 overflow-hidden py-2 text-zinc-900",
         RARITY_BG[card.rarity] ?? RARITY_BG.common,
-        big ? CARD_SIZE_BIG : CARD_SIZE,
+        big ? CARD_SIZE_BIG : small ? CARD_SIZE_SMALL : CARD_SIZE,
         VARIANT_RING[card.variant],
         className,
       )}
     >
-      <CardContent className="flex flex-1 flex-col gap-2 px-2">
+      <CardContent className="relative flex flex-1 flex-col gap-2 px-2">
+        {card.is_favorite && (
+          <Star
+            className="absolute top-1 right-3 z-10 size-5 fill-amber-400 text-amber-500 drop-shadow"
+            aria-label="Favori"
+          />
+        )}
         {big ? (
-          <a href={videoUrl(videoId)} target="_blank" rel="noreferrer" title="Voir la vidéo">
+          <a
+            href={videoUrl(videoId)}
+            target="_blank"
+            rel="noreferrer"
+            title="Voir la vidéo"
+          >
             {thumb}
           </a>
         ) : (
@@ -81,17 +117,55 @@ export function Card({ card, big = false, className }: { card: CardData; big?: b
         )}
         <div className="flex flex-wrap items-center gap-1">
           {big && (
-            <Badge className={(RARITY_BADGE[card.rarity] ?? RARITY_BADGE.common).className}>
+            <Badge
+              className={
+                (RARITY_BADGE[card.rarity] ?? RARITY_BADGE.common).className
+              }
+            >
               {(RARITY_BADGE[card.rarity] ?? RARITY_BADGE.common).label}
             </Badge>
           )}
-          {card.variant !== "normal" && <Badge variant="outline" className="border-zinc-900/20 text-zinc-900">{card.variant}</Badge>}
-          {card.videos.factions && <Badge variant="outline" className="border-zinc-900/20 text-zinc-900">{card.videos.factions.name}</Badge>}
+          {card.variant !== "normal" && (
+            <Badge
+              variant="outline"
+              className="border-zinc-900/20 text-zinc-900"
+            >
+              {card.variant}
+            </Badge>
+          )}
+          {card.videos.factions && (
+            <Badge
+              variant="outline"
+              className="border-zinc-900/20 text-zinc-900"
+            >
+              {card.videos.factions.name}
+            </Badge>
+          )}
         </div>
-        <p className={cn("line-clamp-2 text-sm font-medium", big && "text-base")}>{card.videos.title}</p>
-        <p className="mt-auto text-xs text-zinc-700">
-          ⚔️ {card.attack} · 🛡️ {card.defense} · 👁️ {card.snap_view_count.toLocaleString("fr-FR")}
+        <p
+          className={cn("line-clamp-2 text-sm font-medium", big && "text-base")}
+        >
+          {card.videos.title}
         </p>
+        {/* Bas de carte : chaîne puis stats, alignés à gauche */}
+        <div className="mt-auto grid gap-1 text-left">
+          {card.videos.creators && (
+            <p className="truncate text-xs text-zinc-600">
+              {card.videos.creators.name}
+            </p>
+          )}
+          <p className="flex items-center gap-3 text-xs text-zinc-700 [&_svg]:size-3.5">
+            <span className="flex items-center gap-1" title="Attaque">
+              <Sword className="text-red-500" /> {card.attack}
+            </span>
+            <span className="flex items-center gap-1" title="Défense">
+              <Shield className="text-blue-500" /> {card.defense}
+            </span>
+            <span className="flex items-center gap-1" title="Vues">
+              <Eye /> {card.snap_view_count.toLocaleString("fr-FR")}
+            </span>
+          </p>
+        </div>
       </CardContent>
     </UiCard>
   );

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { CARD_SIZE, RARITY_BG, thumbnailUrl } from "@/components/Card";
+import { Sword } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { DeckPicker } from "@/components/DeckPicker";
@@ -55,7 +56,9 @@ function Team({ title, cards, factions }: {
             <p className="line-clamp-2 text-sm font-medium">{c.title}</p>
             <div className="mt-auto grid gap-1">
               <meter min={0} max={c.max_hp} value={c.hp} className="w-full" />
-              <small className="text-zinc-700">❤️ {c.hp}/{c.max_hp} · ⚔️ {c.attack}</small>
+              <small className="flex items-center gap-1 text-zinc-700">
+                ❤️ {c.hp}/{c.max_hp} · <Sword className="size-3.5 text-red-500" aria-label="Attaque" /> {c.attack}
+              </small>
             </div>
           </li>
         ))}

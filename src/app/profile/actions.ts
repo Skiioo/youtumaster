@@ -24,3 +24,10 @@ export async function equipCosmetics(formData: FormData) {
   await db.from("users").update(update).eq("id", user!.id);
   redirect("/profile?saved=1");
 }
+
+export async function setActiveTitle(formData: FormData) {
+  const title = formData.get("title");
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("set_active_title", { p_title: title ? Number(title) : null });
+  redirect(error ? `/profile?error=${encodeURIComponent("Tu ne possèdes pas ce titre.")}` : "/profile?saved=title");
+}

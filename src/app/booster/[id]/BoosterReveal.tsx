@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, RotateCw } from "lucide-react";
 import { Card, type CardData } from "@/components/Card";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -93,12 +93,12 @@ export function BoosterReveal({
             {back}
             <div className="absolute inset-0 overflow-auto rounded-xl text-left rotate-y-180 backface-hidden">
               {current.card ? (
-                <Link href={`/card/${current.card.id}`} className="block h-full">
+                <Link href={`/collection?card=${current.card.id}`} className="card-link h-full">
                   <Card card={current.card} className="h-full" />
                 </Link>
               ) : (
                 <div className="grid size-full place-items-center rounded-xl border bg-card p-4 text-center">
-                  <span className="text-4xl">🔄</span>
+                  <RotateCw className="size-10" aria-hidden />
                   <span className="font-semibold">Jeton de Refresh</span>
                 </div>
               )}

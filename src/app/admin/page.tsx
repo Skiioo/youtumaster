@@ -1,3 +1,4 @@
+import { PageTitle } from "@/components/PageTitle";
 import { notFound } from "next/navigation";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
@@ -21,11 +22,11 @@ export default async function AdminPage({ searchParams }: PageProps<"/admin">) {
 
   return (
     <main style={{ padding: 24, display: "grid", gap: 24 }}>
-      <h1>Admin</h1>
+      <PageTitle href="/admin">Admin</PageTitle>
       {msg && <p role="status">{msg}</p>}
 
       <section style={box}>
-        <h2>Whitelist YAOT</h2>
+        <h2>Whitelist YOAT</h2>
         <form action={addGoat} style={{ display: "grid", gap: 8 }}>
           <input name="video" placeholder="Lien ou ID de la vidéo" required />
           <input name="reason" placeholder="Pourquoi elle est culte" required />

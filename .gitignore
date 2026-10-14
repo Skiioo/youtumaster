@@ -39,3 +39,7 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# script local de test de sécurité (non versionné)
+scripts/security-audit.mts
+scripts/security-audit.md

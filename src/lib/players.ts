@@ -14,3 +14,6 @@ export function parseVideoId(input: string): string {
     return s;
   }
 }
+
+/** ID joueur affiché en deux blocs : ABCD2345 -> ABCD-2345 */
+export const formatFriendCode = (code: string | null | undefined) => (code ? `${code.slice(0, 4)}-${code.slice(4)}` : "");

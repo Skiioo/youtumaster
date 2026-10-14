@@ -1,3 +1,4 @@
+import { PageTitle } from "@/components/PageTitle";
 import Link from "next/link";
 import { DeckPicker } from "@/components/DeckPicker";
 import { createMatch } from "@/app/match/actions";
@@ -19,7 +20,7 @@ export default async function PlayPage({ searchParams }: PageProps<"/play">) {
 
   return (
     <main style={{ padding: 24 }}>
-      <h1>Combat</h1>
+      <PageTitle href="/play">Combat</PageTitle>
       {error && <p role="alert" style={{ color: "crimson" }}>{error}</p>}
 
       {mine.length > 0 && (

@@ -1,26 +1,42 @@
-import { login, signup } from "@/app/auth/actions";
+import Link from "next/link";
+import { redirect } from "next/navigation";
+import { login } from "@/app/auth/actions";
+import { AuthCard } from "@/components/AuthCard";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { createClient } from "@/lib/supabase/server";
 
 export default async function LoginPage({ searchParams }: PageProps<"/login">) {
-  const { error } = await searchParams;
+  const { error, deleted } = await searchParams;
+  const supabase = await createClient();
+  if ((await supabase.auth.getUser()).data.user) redirect("/"); // déjà connecté
 
   return (
-    <main style={{ maxWidth: 360, margin: "48px auto", padding: 16, display: "grid", gap: 32 }}>
-      {error && <p role="alert" style={{ color: "crimson" }}>{error}</p>}
-
-      <form action={login} style={{ display: "grid", gap: 8 }}>
-        <h1>Connexion</h1>
-        <input name="email" type="email" placeholder="Email" required autoComplete="email" />
-        <input name="password" type="password" placeholder="Mot de passe" required autoComplete="current-password" />
-        <button>Se connecter</button>
+    <AuthCard
+      title="Connexion"
+      description="Content de te revoir ! Connecte-toi pour ouvrir tes paquets."
+      footer={
+        <p>
+          Vous n&apos;avez pas de compte ? <Link href="/signup" className="font-medium text-ring hover:underline">S&apos;inscrire</Link>
+        </p>
+      }
+    >
+      <form action={login} className="grid gap-4">
+        {deleted && <p role="status" className="text-sm">Ton compte a bien été supprimé.</p>}
+        {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
+        <div className="grid gap-2">
+          <Label htmlFor="email">Email</Label>
+          <Input id="email" name="email" type="email" required autoComplete="email" />
+        </div>
+        <div className="grid gap-2">
+          <Label htmlFor="password">Mot de passe</Label>
+          <Input id="password" name="password" type="password" required autoComplete="current-password" />
+        </div>
+        <Button type="submit" className="w-full">
+          Se connecter
+        </Button>
       </form>
-
-      <form action={signup} style={{ display: "grid", gap: 8 }}>
-        <h2>Inscription</h2>
-        <input name="username" placeholder="Pseudo" required minLength={3} maxLength={20} pattern="[a-zA-Z0-9_]+" />
-        <input name="email" type="email" placeholder="Email" required autoComplete="email" />
-        <input name="password" type="password" placeholder="Mot de passe (8+)" required minLength={8} autoComplete="new-password" />
-        <button>Créer mon compte</button>
-      </form>
-    </main>
+    </AuthCard>
   );
 }

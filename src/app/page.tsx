@@ -1,6 +1,7 @@
-import Link from "next/link";
 import { openBooster } from "@/app/booster/actions";
+import { BoosterCountdown } from "@/components/BoosterCountdown";
 import { BoosterPack } from "@/components/BoosterPack";
+import { Landing } from "@/components/Landing";
 import { createClient } from "@/lib/supabase/server";
 
 export default async function Home({ searchParams }: PageProps<"/">) {
@@ -8,13 +9,7 @@ export default async function Home({ searchParams }: PageProps<"/">) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
 
-  if (!user) {
-    return (
-      <main className="grid min-h-svh place-items-center p-6">
-        <Link href="/login">Se connecter / S&apos;inscrire</Link>
-      </main>
-    );
-  }
+  if (!user) return <Landing />; // visiteur : présentation du jeu
 
   const { data: boosters } = await supabase.rpc("booster_state").single<{ available: number; next_in_seconds: number | null }>();
   const available = boosters?.available ?? 0;
@@ -36,10 +31,12 @@ export default async function Home({ searchParams }: PageProps<"/">) {
         </button>
       </form>
 
-      <p className="text-sm text-muted-foreground">
-        <span className="font-semibold text-foreground">{available}</span> paquet{available > 1 ? "s" : ""} à ouvrir
-        {boosters?.next_in_seconds != null && <> · prochain dans {boosters.next_in_seconds} s</>}
-      </p>
+      {/* key : le décompte repart de zéro à chaque nouvelle valeur calculée par le serveur */}
+      <BoosterCountdown
+        key={`${available}-${boosters?.next_in_seconds}`}
+        available={available}
+        nextIn={boosters?.next_in_seconds ?? null}
+      />
     </main>
   );
 }

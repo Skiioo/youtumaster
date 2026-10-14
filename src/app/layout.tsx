@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 import { Roboto } from "next/font/google";
 import Script from "next/script";
-import { Coins } from "lucide-react";
 import { AppSidebar } from "@/components/AppSidebar";
+import { CoinCounter } from "@/components/CoinCounter";
 import {
   SidebarInset,
   SidebarProvider,
@@ -35,10 +35,14 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
         .eq("id", user.id)
         .maybeSingle()
     : { data: null };
+  const { count: unreadMessages } = user
+    ? await supabase.from("messages").select("id", { count: "exact", head: true }).eq("recipient_id", user.id).is("read_at", null)
+    : { count: 0 };
 
   return (
     <html lang="fr" className={roboto.variable} suppressHydrationWarning>
-      <body>
+      {/* suppressHydrationWarning : certaines extensions (ColorZilla…) ajoutent des attributs au <body> */}
+      <body suppressHydrationWarning>
         {/* Avant l'affichage : thème choisi (localStorage) sinon celui du système ; .dark active le thème sombre shadcn */}
         <Script id="theme" strategy="beforeInteractive">
           {`try{var t=localStorage.getItem("theme");document.documentElement.classList.toggle("dark",t?t==="dark":matchMedia("(prefers-color-scheme: dark)").matches)}catch(e){}`}
@@ -46,14 +50,10 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
         <TooltipProvider>
           {profile ? (
             <SidebarProvider>
-              <AppSidebar isAdmin={profile.role === "admin"} />
+              <AppSidebar isAdmin={profile.role === "admin"} userId={user!.id} unreadMessages={unreadMessages ?? 0} />
               <SidebarInset className="relative">
                 {/* Solde de ViewCoins, en haut à droite de chaque page */}
-                <div className="absolute top-3 right-4 z-10 flex items-center gap-1.5 rounded-full border bg-background px-3 py-1 text-sm font-semibold shadow-sm">
-                  <Coins className="size-4 text-amber-500" />
-                  {profile.viewcoins.toLocaleString("fr-FR")}
-                  <span className="sr-only">ViewCoins</span>
-                </div>
+                <CoinCounter userId={user!.id} initial={profile.viewcoins} />
                 {/* Bouton menu uniquement sur mobile, où la sidebar est un panneau glissant */}
                 <header className="flex h-12 items-center border-b px-3 md:hidden">
                   <SidebarTrigger />

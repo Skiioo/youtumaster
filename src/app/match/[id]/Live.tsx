@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { createClient } from "@/lib/supabase/client";
+import { subscribeToUpdates } from "@/lib/supabase/client";
 import { resolveTimeout } from "../actions";
 
 /** Recharge la page à chaque coup de l'adversaire (temps réel) + chrono du quiz. */
@@ -10,18 +10,7 @@ export function Live({ matchId, expiresAt }: { matchId: string; expiresAt?: stri
   const router = useRouter();
   const [left, setLeft] = useState<number | null>(null);
 
-  useEffect(() => {
-    const supabase = createClient();
-    const channel = supabase
-      .channel(`match-${matchId}`)
-      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "matches", filter: `id=eq.${matchId}` }, () =>
-        router.refresh(),
-      )
-      .subscribe();
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [matchId, router]);
+  useEffect(() => subscribeToUpdates("matches", matchId, () => router.refresh()), [matchId, router]);
 
   useEffect(() => {
     if (!expiresAt) return;

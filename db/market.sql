@@ -15,8 +15,10 @@ BEGIN
   END IF;
 END $$;
 
--- Mettre une de ses cartes en vente
-CREATE OR REPLACE FUNCTION public.create_listing(p_card uuid, p_start_price bigint) RETURNS uuid
+-- Mettre une de ses cartes en vente, pour une durée choisie (1, 6, 12, 24, 48 ou 72 h ;
+-- par défaut market_duration_hours). L'ancienne version sans durée est remplacée.
+DROP FUNCTION IF EXISTS public.create_listing(uuid, bigint);
+CREATE OR REPLACE FUNCTION public.create_listing(p_card uuid, p_start_price bigint, p_hours int DEFAULT NULL) RETURNS uuid
 LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path = '' AS $$
 DECLARE u public.users; c public.cards; v_id uuid;
 BEGIN
@@ -24,6 +26,7 @@ BEGIN
   IF NOT FOUND THEN RAISE EXCEPTION 'not_authenticated'; END IF;
   PERFORM public.market_check_unlocked(u);
   IF p_start_price IS NULL OR p_start_price < 1 THEN RAISE EXCEPTION 'invalid_price'; END IF;
+  IF p_hours IS NOT NULL AND p_hours NOT IN (1, 6, 12, 24, 48, 72) THEN RAISE EXCEPTION 'invalid_duration'; END IF;
 
   SELECT * INTO c FROM public.cards WHERE id = p_card AND owner_id = u.id FOR UPDATE;
   IF NOT FOUND THEN RAISE EXCEPTION 'not_your_card'; END IF;
@@ -32,7 +35,7 @@ BEGIN
   UPDATE public.cards SET locked_reason = 'listing' WHERE id = c.id;
   INSERT INTO public.market_listings (card_id, seller_id, start_price, tax_rate, ends_at)
   VALUES (c.id, u.id, p_start_price, public.cfg('market_tax_rate'),
-          now() + make_interval(hours => public.cfg('market_duration_hours')::int))
+          now() + make_interval(hours => coalesce(p_hours, public.cfg('market_duration_hours')::int)))
   RETURNING id INTO v_id;
   RETURN v_id;
 END $$;
@@ -107,9 +110,9 @@ BEGIN
 END $$;
 
 REVOKE ALL ON FUNCTION public.market_check_unlocked(public.users),
-  public.create_listing(uuid, bigint), public.place_bid(uuid, bigint),
+  public.create_listing(uuid, bigint, int), public.place_bid(uuid, bigint),
   public.close_expired_listings() FROM PUBLIC, anon, authenticated;
-GRANT EXECUTE ON FUNCTION public.create_listing(uuid, bigint), public.place_bid(uuid, bigint),
+GRANT EXECUTE ON FUNCTION public.create_listing(uuid, bigint, int), public.place_bid(uuid, bigint),
   public.close_expired_listings() TO authenticated;
 
 -- Lecture : annonces, cartes en vente et historique des ventes sont publics pour les joueurs

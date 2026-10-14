@@ -1,6 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { safeReturnTo, withParams } from "@/lib/cardFilters";
 import { updateVideosFromApi } from "@/lib/refresh";
 import { createClient } from "@/lib/supabase/server";
 
@@ -9,6 +10,16 @@ const ERRORS: Record<string, string> = {
   not_your_card: "Cette carte ne t'appartient pas.",
   card_locked: "Impossible pendant un combat.",
 };
+
+/** Retour à la page d'origine, popup de la carte toujours ouverte (avec ou sans message d'erreur). */
+const back = (formData: FormData, error?: string) =>
+  redirect(withParams(safeReturnTo(formData.get("returnTo")), { error: error ?? null }));
+
+export async function toggleFavorite(formData: FormData) {
+  const supabase = await createClient();
+  await supabase.rpc("toggle_favorite", { p_card: String(formData.get("cardId")) });
+  back(formData);
+}
 
 export async function applyRefreshToken(formData: FormData) {
   const cardId = String(formData.get("cardId"));
@@ -19,12 +30,12 @@ export async function applyRefreshToken(formData: FormData) {
     supabase.from("cards").select("videos(platform_video_id)").eq("id", cardId).returns<{ videos: { platform_video_id: string } }[]>().maybeSingle(),
   ]);
   // Vérifié avant l'appel API pour ne pas brûler de quota sans jeton (re-vérifié en SQL)
-  if (!me?.refresh_tokens) redirect(`/card/${cardId}?error=${encodeURIComponent(ERRORS.no_refresh_token)}`);
-  if (!card) redirect(`/card/${cardId}?error=${encodeURIComponent(ERRORS.not_your_card)}`);
+  if (!me?.refresh_tokens) back(formData, ERRORS.no_refresh_token);
+  if (!card) back(formData, ERRORS.not_your_card);
 
-  if (!(await updateVideosFromApi([card.videos.platform_video_id]))) {
-    redirect(`/card/${cardId}?error=${encodeURIComponent("Service vidéo indisponible, ton jeton n'a pas été utilisé.")}`);
+  if (!(await updateVideosFromApi([card!.videos.platform_video_id]))) {
+    back(formData, "Service vidéo indisponible, ton jeton n'a pas été utilisé.");
   }
   const { error } = await supabase.rpc("use_refresh_token", { p_card: cardId });
-  redirect(error ? `/card/${cardId}?error=${encodeURIComponent(ERRORS[error.message] ?? error.message)}` : `/card/${cardId}`);
+  back(formData, error ? (ERRORS[error.message] ?? error.message) : undefined);
 }

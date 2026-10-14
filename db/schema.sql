@@ -31,7 +31,7 @@ CREATE TABLE game_config (
 );
 
 INSERT INTO game_config (key, value) VALUES
-  ('booster_interval_seconds', '120'),
+  ('booster_interval_seconds', '600'),       -- 10 minutes
   ('booster_stock_cap',        '10'),
   ('booster_size',             '5'),
   ('refresh_token_drop_rate',  '0.05'),
