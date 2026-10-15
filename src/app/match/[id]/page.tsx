@@ -1,178 +1,200 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { CARD_SIZE, RARITY_BG, thumbnailUrl } from "@/components/Card";
-import { Sword } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
-import { cn } from "@/lib/utils";
+import { Check, Flag, Swords, Trophy, X } from "lucide-react";
+import { thumbnailUrl } from "@/components/Card";
 import { DeckPicker } from "@/components/DeckPicker";
+import type { Fighter } from "@/components/FighterCard";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { createClient } from "@/lib/supabase/server";
-import { answerQuiz, attack, cancelMatch, joinMatch } from "../actions";
+import { cn } from "@/lib/utils";
+import { answerQuiz, joinMatch } from "../actions";
+import { Battlefield } from "./Battlefield";
 import { Live } from "./Live";
-
-type FighterCard = {
-  owner: string;
-  video: string;
-  title: string;
-  rarity: string;
-  faction: number | null;
-  attack: number;
-  hp: number;
-  max_hp: number;
-};
+import { MatchGuard } from "./MatchGuard";
+import { Searching } from "./Searching";
 
 type MatchState = {
   phase: "waiting" | "choose" | "quiz" | "finished";
   turn?: string;
-  cards: Record<string, FighterCard>;
+  cards: Record<string, Fighter>;
   collectif: Record<string, number>;
+  names?: Record<string, string>;
+  forfeit?: string;
   quiz?: { video: string; target: string; question: string; choices: string[]; expires_at: string };
   last?: { attacker: string; target: string; correct: boolean; damage: number; answer: string };
 };
 
-function Team({ title, cards, factions }: {
-  title: string;
-  cards: [string, FighterCard][];
-  factions: Map<number, string>;
-}) {
-  return (
-    <section>
-      <h2>{title}</h2>
-      <ul className="card-grid">
-        {cards.map(([id, c]) => (
-          <li
-            key={id}
-            className={cn(
-              "flex flex-col gap-2 overflow-hidden rounded-xl p-2 text-zinc-900 ring-1 ring-foreground/10",
-              CARD_SIZE,
-              RARITY_BG[c.rarity] ?? RARITY_BG.common,
-              c.hp <= 0 && "opacity-35 grayscale",
-            )}
-          >
-            {/* eslint-disable-next-line @next/next/no-img-element -- miniature externe */}
-            <img src={thumbnailUrl(c.video)} alt={c.title} className="aspect-video w-full rounded-md object-cover" />
-            <div className="flex flex-wrap gap-1">
-              <Badge variant="outline" className="border-zinc-900/20 text-zinc-900">{factions.get(c.faction ?? 0) ?? "?"}</Badge>
-            </div>
-            <p className="line-clamp-2 text-sm font-medium">{c.title}</p>
-            <div className="mt-auto grid gap-1">
-              <meter min={0} max={c.max_hp} value={c.hp} className="w-full" />
-              <small className="flex items-center gap-1 text-zinc-700">
-                ❤️ {c.hp}/{c.max_hp} · <Sword className="size-3.5 text-red-500" aria-label="Attaque" /> {c.attack}
-              </small>
-            </div>
-          </li>
-        ))}
-      </ul>
-    </section>
-  );
-}
-
 export default async function MatchPage({ params, searchParams }: PageProps<"/match/[id]">) {
   const [{ id }, { error }] = await Promise.all([params, searchParams]);
   const supabase = await createClient();
-  const [{ data: m }, { data: { user } }, { data: factionRows }] = await Promise.all([
-    supabase.from("matches").select("id, status, player_a_id, player_b_id, winner_id, state").eq("id", id).maybeSingle(),
+  const [{ data: m }, { data: { user } }, { data: factionRows }, { data: quizCfg }] = await Promise.all([
+    supabase.from("matches").select("id, status, player_a_id, player_b_id, invited_id, winner_id, state, created_at").eq("id", id).maybeSingle(),
     supabase.auth.getUser(),
     supabase.from("factions").select("id, name"),
+    supabase.from("game_config").select("value").eq("key", "quiz_seconds").maybeSingle(),
   ]);
   if (!m || !user) notFound();
 
   const state = m.state as MatchState;
-  const factions = new Map((factionRows ?? []).map((f) => [f.id as number, f.name as string]));
+  const factions = Object.fromEntries((factionRows ?? []).map((f) => [f.id as number, f.name as string]));
   const all = Object.entries(state.cards);
   const myCards = all.filter(([, c]) => c.owner === user.id);
   const theirCards = all.filter(([, c]) => c.owner !== user.id);
   const isPlayer = [m.player_a_id, m.player_b_id].includes(user.id);
+  const opponentId = m.player_a_id === user.id ? m.player_b_id : m.player_a_id;
+  const name = (uid: string | null) => (uid && state.names?.[uid]) || "Adversaire";
   const myTurn = state.turn === user.id;
-  const errorBox = error && <p role="alert" style={{ color: "crimson" }}>{error}</p>;
+  const errorBox = error && <p role="alert" className="text-center text-sm text-destructive">{error}</p>;
+  const back = (
+    <Button variant="ghost" nativeButton={false} render={<Link href="/play" />} className="w-fit">
+      ← Combat
+    </Button>
+  );
 
-  if (m.status === "waiting") {
+  // ---------------------------------------------------------------- En attente d'un adversaire
+  if (m.status === "waiting" || m.status === "aborted") {
     return (
-      <main style={{ padding: 24 }}>
-        <Live matchId={m.id} />
+      <main className="grid gap-6 p-6">
+        {m.status === "waiting" && <Live matchId={m.id} />}
+        {/* Partie active du joueur : pas de retour libre, quitter = annuler (double validation) */}
+        {m.status === "waiting" && isPlayer ? <MatchGuard matchId={m.id} inProgress={false} /> : back}
         {errorBox}
-        {isPlayer ? (
-          <>
-            <p>⏳ En attente d&apos;un adversaire… Partage l&apos;adresse de cette page à un ami, ou attends qu&apos;un joueur relève ton défi.</p>
-            <form action={cancelMatch}>
-              <input type="hidden" name="matchId" value={m.id} />
-              <button>Annuler le défi</button>
-            </form>
-          </>
+        {m.status === "aborted" ? (
+          <Card className="mx-auto w-full max-w-lg">
+            <CardHeader>
+              <CardTitle>Partie annulée</CardTitle>
+              <CardDescription>Cette partie a été quittée et n&apos;existe plus.</CardDescription>
+            </CardHeader>
+          </Card>
+        ) : isPlayer ? (
+          <Card className="mx-auto w-full max-w-lg text-center">
+            <CardHeader>
+              <CardTitle>{m.invited_id ? "⏳ En attente de ton ami…" : "Recherche d'un adversaire…"}</CardTitle>
+              <CardDescription>
+                {m.invited_id
+                  ? "Ton ami retrouve ton défi dans sa page Combat. La partie démarre dès qu'il le relève."
+                  : "La partie démarre automatiquement dès qu'un autre joueur cherche aussi. Garde cette page ouverte."}
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="grid justify-items-center gap-6">
+              {!m.invited_id && <Searching since={m.created_at} />}
+            </CardContent>
+          </Card>
         ) : (
-          <>
-            <h1>Relever le défi</h1>
+          <div className="grid gap-4">
+            <h1 className="text-center">Relever le défi de {name(m.player_a_id)}</h1>
+            <p className="text-center text-sm text-muted-foreground">Choisis 4 cartes pour l&apos;affronter.</p>
             <DeckPicker action={joinMatch} matchId={m.id} label="Combattre !" />
-          </>
+          </div>
         )}
-        <Link href="/play">← Combat</Link>
       </main>
     );
   }
 
+  // ---------------------------------------------------------------- Match en cours ou terminé
+  const finished = m.status === "finished";
+  const won = m.winner_id === user.id;
   const last = state.last;
+  const quiz = state.phase === "quiz" ? state.quiz : undefined;
+  const iAmDefender = !!quiz && !myTurn;
+
   return (
-    <main style={{ padding: 24, display: "grid", gap: 16 }}>
-      {m.status !== "finished" && <Live matchId={m.id} expiresAt={state.quiz?.expires_at} />}
+    <main className="grid gap-6 p-6">
+      {!finished && <Live matchId={m.id} expiresAt={quiz?.expires_at} totalSeconds={Number(quizCfg?.value ?? 20)} />}
+
+      {/* En-tête : joueurs, statut, quitter (= abandon). Marge droite : place du compteur de ViewCoins */}
+      <div className="flex flex-wrap items-center justify-between gap-3 pr-28">
+        {finished ? back : <MatchGuard matchId={m.id} inProgress />}
+        <div className="flex items-center gap-2 text-lg font-bold">
+          <span>{name(user.id)}</span>
+          <Swords className="size-5 text-ring" />
+          <span>{name(opponentId)}</span>
+        </div>
+        {finished ? <Badge variant="secondary">Terminé</Badge> : <Badge className="bg-ring text-white">En cours</Badge>}
+      </div>
       {errorBox}
 
-      {m.status === "finished" && (
-        <h1>{m.winner_id === user.id ? "🏆 Victoire ! +100 ViewCoins" : "💀 Défaite"}</h1>
+      {finished && (
+        <Card className={cn("mx-auto w-full max-w-lg text-center", won ? "border-amber-400" : "border-destructive/40")}>
+          <CardHeader className="justify-items-center gap-2">
+            {won ? <Trophy className="size-12 text-amber-500" /> : <Flag className="size-12 text-muted-foreground" />}
+            <CardTitle className="text-2xl">{won ? "Victoire !" : "Défaite"}</CardTitle>
+            <CardDescription>
+              {state.forfeit
+                ? state.forfeit === user.id
+                  ? "Tu as abandonné le match."
+                  : `${name(opponentId)} a abandonné.`
+                : won
+                  ? "Toutes les cartes adverses sont K.O."
+                  : "Toutes tes cartes sont K.O."}
+              {won && " +100 ViewCoins"}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button nativeButton={false} render={<Link href="/play" />}>
+              Nouveau combat
+            </Button>
+          </CardContent>
+        </Card>
       )}
 
-      {last && (
-        <p>
-          Dernier coup : {last.correct ? "✅ esquivé !" : `💥 ${last.damage} dégâts`} sur {state.cards[last.target]?.title}
-          {" "}(bonne réponse : {last.answer})
-        </p>
-      )}
+      <Battlefield
+        matchId={m.id}
+        mine={myCards}
+        theirs={theirCards}
+        factions={factions}
+        myName={`${name(user.id)} · Collectif ×${state.collectif[user.id] ?? 1}`}
+        theirName={`${name(opponentId)} · Collectif ×${(opponentId && state.collectif[opponentId]) ?? 1}`}
+        canAttack={!finished && state.phase === "choose" && myTurn}
+        target={quiz?.target}
+      >
+        {/* Résultat du dernier quiz : seulement juste / faux */}
+        {last && !quiz && (
+          <p
+            className={cn(
+              "flex items-center gap-1.5 rounded-full px-4 py-1.5 text-sm font-medium",
+              last.correct ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400" : "bg-red-500/15 text-red-600 dark:text-red-400",
+            )}
+          >
+            {last.correct ? <Check className="size-4" /> : <X className="size-4" />}
+            {last.correct ? "Bonne réponse" : "Mauvaise réponse"}
+          </p>
+        )}
 
-      <Team title="Adversaire" cards={theirCards} factions={factions} />
+        {/* Quiz : seule la miniature de la carte attaquante est montrée */}
+        {quiz && (
+          <Card className="w-full max-w-xl">
+            <CardContent className="grid gap-4">
+              {/* eslint-disable-next-line @next/next/no-img-element -- miniature externe ; la carte attaquante reste cachée */}
+              <img src={thumbnailUrl(quiz.video)} alt="Carte attaquante (cachée)" className="aspect-video w-full rounded-lg object-cover" />
+              <div className="grid gap-1 text-center">
+                <p className="text-lg font-semibold">{quiz.question}</p>
+                <p className="text-xs text-muted-foreground">
+                  Cible : {state.cards[quiz.target]?.title.slice(0, 50)}
+                </p>
+              </div>
+              {iAmDefender ? (
+                <form action={answerQuiz} className="grid grid-cols-2 gap-2">
+                  <input type="hidden" name="matchId" value={m.id} />
+                  {quiz.choices.map((choice, i) => (
+                    <Button key={choice} type="submit" name="choice" value={String(i + 1)} variant="outline" className="h-auto min-h-11 whitespace-normal">
+                      {choice}
+                    </Button>
+                  ))}
+                </form>
+              ) : (
+                <p className="text-center text-sm text-muted-foreground">{name(opponentId)} réfléchit…</p>
+              )}
+            </CardContent>
+          </Card>
+        )}
 
-      {state.phase === "quiz" && state.quiz && (
-        <section style={{ textAlign: "center" }}>
-          {/* eslint-disable-next-line @next/next/no-img-element -- miniature externe ; la carte attaquante reste cachée */}
-          <img src={thumbnailUrl(state.quiz.video)} alt="Carte attaquante" style={{ maxWidth: 360, width: "100%", borderRadius: 8 }} />
-          <h2>{state.quiz.question}</h2>
-          <p>Cible : {state.cards[state.quiz.target]?.title}</p>
-          {myTurn ? (
-            <p>L&apos;adversaire réfléchit…</p>
-          ) : (
-            <form action={answerQuiz} style={{ display: "flex", gap: 8, justifyContent: "center", flexWrap: "wrap" }}>
-              <input type="hidden" name="matchId" value={m.id} />
-              {state.quiz.choices.map((choice, i) => (
-                <button key={choice} name="choice" value={i + 1}>{choice}</button>
-              ))}
-            </form>
-          )}
-        </section>
-      )}
-
-      {state.phase === "choose" && (
-        myTurn ? (
-          <form action={attack} style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-            <input type="hidden" name="matchId" value={m.id} />
-            <label>
-              Attaquer avec{" "}
-              <select name="card" required>
-                {myCards.filter(([, c]) => c.hp > 0).map(([cid, c]) => <option key={cid} value={cid}>{c.title} (⚔️ {c.attack})</option>)}
-              </select>
-            </label>
-            <label>
-              la cible{" "}
-              <select name="target" required>
-                {theirCards.filter(([, c]) => c.hp > 0).map(([cid, c]) => <option key={cid} value={cid}>{c.title} (❤️ {c.hp})</option>)}
-              </select>
-            </label>
-            <button>⚔️ Attaquer</button>
-          </form>
-        ) : (
-          <p>⏳ Tour de l&apos;adversaire…</p>
-        )
-      )}
-
-      <Team title={`Ton équipe (Collectif x${state.collectif[user.id] ?? 1})`} cards={myCards} factions={factions} />
-      <Link href="/play">← Combat</Link>
+        {!finished && state.phase === "choose" && !myTurn && (
+          <p className="text-sm text-muted-foreground">⏳ {name(opponentId)} choisit son attaque…</p>
+        )}
+      </Battlefield>
     </main>
   );
 }

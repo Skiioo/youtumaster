@@ -1,11 +1,14 @@
-import { Card, CARD_SELECT, type CardData } from "@/components/Card";
+import { CARD_SELECT, type CardData } from "@/components/Card";
+import { DeckSelect } from "@/components/DeckSelect";
 import { createClient } from "@/lib/supabase/server";
 
-/** Choix de 4 cartes libres (ni en vente, ni en combat). */
-export async function DeckPicker({ action, matchId, label }: {
+/** Choix de 4 cartes libres (ni en vente, ni en combat), les plus fortes d'abord. */
+export async function DeckPicker({ action, matchId, label, hidden }: {
   action: (formData: FormData) => Promise<void>;
   matchId?: string;
   label: string;
+  /** Champs cachés en plus dans le formulaire (ex. : ami invité) */
+  hidden?: Record<string, string>;
 }) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -20,19 +23,12 @@ export async function DeckPicker({ action, matchId, label }: {
     .returns<CardData[]>();
 
   return (
-    <form action={action}>
+    <form action={action} className="grid gap-4">
       {matchId && <input type="hidden" name="matchId" value={matchId} />}
-      <p>Coche exactement 4 cartes, puis : <button>{label}</button></p>
-      <ul className="card-grid">
-        {cards?.map((c) => (
-          <li key={c.id}>
-            <label>
-              <input type="checkbox" name="card" value={c.id} /> Choisir
-              <Card card={c} />
-            </label>
-          </li>
-        ))}
-      </ul>
+      {Object.entries(hidden ?? {}).map(([name, value]) => (
+        <input key={name} type="hidden" name={name} value={value} />
+      ))}
+      <DeckSelect cards={cards ?? []} label={label} />
     </form>
   );
 }

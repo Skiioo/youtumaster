@@ -17,3 +17,8 @@ export function parseVideoId(input: string): string {
 
 /** ID joueur affiché en deux blocs : ABCD2345 -> ABCD-2345 */
 export const formatFriendCode = (code: string | null | undefined) => (code ? `${code.slice(0, 4)}-${code.slice(4)}` : "");
+
+/** Délai sans signal au-delà duquel un joueur a quitté sa partie (même règle que match_leave.sql) */
+export const LEAVE_AFTER_MS = 45_000;
+/** Limite à partir de laquelle un défi en attente est encore valable (créateur toujours présent) */
+export const freshSince = () => new Date(Date.now() - LEAVE_AFTER_MS).toISOString();

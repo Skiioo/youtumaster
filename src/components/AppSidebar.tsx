@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { LogOut } from "lucide-react";
 import { logout } from "@/app/auth/actions";
 import { ADMIN_NAV, NAV } from "@/lib/nav";
+import { freshSince } from "@/lib/players";
 import { createClient, subscribeToChanges } from "@/lib/supabase/client";
 import {
   Sidebar,
@@ -28,44 +29,68 @@ const ITEM = "h-11 gap-3 px-3 text-base [&_svg]:size-5";
  */
 const NAV_ITEM = `${ITEM} text-muted-foreground data-active:text-ring data-active:hover:text-ring [&_svg]:text-sidebar-foreground`;
 
-/**
- * Nombre de messages non lus, en direct : recompté à chaque message reçu (INSERT)
- * et à chaque message lu (UPDATE de read_at). Rien si 0, "99+" au-delà de 99.
- */
-function UnreadBadge({ userId, initial }: { userId: string; initial: number }) {
+type SupabaseBrowser = ReturnType<typeof createClient>;
+
+/** Sources des pastilles : que compter, et quels changements écouter en temps réel */
+const BADGES = {
+  // Messages non lus : recompte à chaque message reçu (INSERT) ou lu (UPDATE de read_at)
+  messages: {
+    table: "messages",
+    filter: (u: string) => `recipient_id=eq.${u}`,
+    count: (db: SupabaseBrowser, u: string) =>
+      db.from("messages").select("id", { count: "exact", head: true }).eq("recipient_id", u).is("read_at", null),
+    label: (n: number) => `${n} message${n > 1 ? "s" : ""} non lu${n > 1 ? "s" : ""}`,
+    refreshMs: 0,
+  },
+  // Duels d'amis reçus et toujours valables (créateur encore présent : signal de moins de 45 s)
+  duels: {
+    table: "matches",
+    filter: (u: string) => `invited_id=eq.${u}`,
+    count: (db: SupabaseBrowser, u: string) =>
+      db
+        .from("matches")
+        .select("id", { count: "exact", head: true })
+        .eq("status", "waiting")
+        .eq("invited_id", u)
+        .gt("last_seen_at", freshSince()),
+    label: (n: number) => `${n} défi${n > 1 ? "s" : ""} d'ami en attente`,
+    refreshMs: 30_000, // un défi expire sans événement (créateur parti) : recompte régulier
+  },
+} as const;
+
+/** Pastille rouge en direct sur une entrée de la sidebar. Rien si 0, "99+" au-delà de 99. */
+function LiveBadge({ kind, userId, initial }: { kind: keyof typeof BADGES; userId: string; initial: number }) {
   const [live, setLive] = useState<number | null>(null);
   const count = live ?? initial;
 
   useEffect(() => {
-    const recount = async () => {
-      const { count } = await createClient()
-        .from("messages")
-        .select("id", { count: "exact", head: true })
-        .eq("recipient_id", userId)
-        .is("read_at", null);
-      setLive(count ?? 0);
-    };
-    const filter = `recipient_id=eq.${userId}`;
-    const stopInserts = subscribeToChanges("INSERT", "messages", filter, recount);
-    const stopUpdates = subscribeToChanges("UPDATE", "messages", filter, recount);
+    const src = BADGES[kind];
+    const recount = async () => setLive((await src.count(createClient(), userId)).count ?? 0);
+    const stops = (["INSERT", "UPDATE"] as const).map((event) => subscribeToChanges(event, src.table, src.filter(userId), recount));
+    const timer = src.refreshMs ? setInterval(recount, src.refreshMs) : undefined;
     return () => {
-      stopInserts();
-      stopUpdates();
+      stops.forEach((stop) => stop());
+      clearInterval(timer);
     };
-  }, [userId]);
+  }, [kind, userId]);
 
   if (count <= 0) return null;
   return (
     <SidebarMenuBadge
       className="top-1/2! right-2 -translate-y-1/2 rounded-full bg-ring px-1.5 text-white peer-hover/menu-button:text-white peer-data-active/menu-button:text-white"
-      aria-label={`${count} message${count > 1 ? "s" : ""} non lu${count > 1 ? "s" : ""}`}
+      aria-label={BADGES[kind].label(count)}
     >
       {count > 99 ? "99+" : count}
     </SidebarMenuBadge>
   );
 }
 
-export function AppSidebar({ isAdmin, userId, unreadMessages }: { isAdmin: boolean; userId: string; unreadMessages: number }) {
+export function AppSidebar({ isAdmin, userId, unreadMessages, pendingDuels }: {
+  isAdmin: boolean;
+  userId: string;
+  unreadMessages: number;
+  pendingDuels: number;
+}) {
   const pathname = usePathname();
   const items = isAdmin ? [...NAV, ADMIN_NAV] : NAV;
   const isActive = (href: string, match: string[]) =>
@@ -89,7 +114,8 @@ export function AppSidebar({ isAdmin, userId, unreadMessages }: { isAdmin: boole
                     <Icon />
                     <span>{label}</span>
                   </SidebarMenuButton>
-                  {href === "/messages" && <UnreadBadge userId={userId} initial={unreadMessages} />}
+                  {href === "/messages" && <LiveBadge kind="messages" userId={userId} initial={unreadMessages} />}
+                  {href === "/play" && <LiveBadge kind="duels" userId={userId} initial={pendingDuels} />}
                 </SidebarMenuItem>
               ))}
             </SidebarMenu>

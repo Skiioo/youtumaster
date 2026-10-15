@@ -14,6 +14,7 @@ const ERRORS: Record<string, string> = {
   invalid_attacker: "Choisis une de tes cartes encore en vie.",
   invalid_target: "Choisis une cible adverse encore en vie.",
   no_quiz: "Il n'y a pas de question en cours.",
+  not_friends: "Tu ne peux défier que tes amis.",
 };
 
 const withError = (path: string, e: { message: string } | null) =>
@@ -26,7 +27,11 @@ export async function createMatch(formData: FormData) {
   if (cards.length !== 4) redirect(withError("/play", { message: "deck_needs_4_cards" }));
   await refreshStaleCards(cards);
   const supabase = await createClient();
-  const { data, error } = await supabase.rpc("create_match", { p_cards: cards });
+  // Un ami choisi : défi réservé ; sinon : recherche d'un adversaire (matchmaking)
+  const invite = String(formData.get("invite") ?? "") || null;
+  const { data, error } = invite
+    ? await supabase.rpc("create_match", { p_cards: cards, p_invite: invite })
+    : await supabase.rpc("find_match", { p_cards: cards });
   redirect(error ? withError("/play", error) : `/match/${data}`);
 }
 
@@ -58,11 +63,17 @@ export async function answerQuiz(formData: FormData) {
   redirect(withError(`/match/${matchId}`, error));
 }
 
-export async function cancelMatch(formData: FormData) {
-  const matchId = String(formData.get("matchId"));
+/** Quitter la partie (après confirmation) : annulation si en attente, abandon si en cours. */
+export async function leaveMatch(matchId: string) {
   const supabase = await createClient();
-  const { error } = await supabase.rpc("cancel_match", { p_match: matchId });
-  redirect(error ? withError(`/match/${matchId}`, error) : "/play");
+  await supabase.rpc("leave_match", { p_match: matchId });
+}
+
+/** Signal de l'écran du match : renvoie le match où aller (null = la partie n'existe plus). */
+export async function searchHeartbeat(matchId: string): Promise<string | null> {
+  const supabase = await createClient();
+  const { data } = await supabase.rpc("search_heartbeat", { p_match: matchId });
+  return (data as string | null) ?? null;
 }
 
 /** Appelée par le chrono côté client quand le temps du quiz est écoulé. */

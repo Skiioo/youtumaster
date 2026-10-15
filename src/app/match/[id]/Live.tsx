@@ -3,10 +3,11 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { subscribeToUpdates } from "@/lib/supabase/client";
+import { cn } from "@/lib/utils";
 import { resolveTimeout } from "../actions";
 
 /** Recharge la page à chaque coup de l'adversaire (temps réel) + chrono du quiz. */
-export function Live({ matchId, expiresAt }: { matchId: string; expiresAt?: string }) {
+export function Live({ matchId, expiresAt, totalSeconds = 20 }: { matchId: string; expiresAt?: string; totalSeconds?: number }) {
   const router = useRouter();
   const [left, setLeft] = useState<number | null>(null);
 
@@ -28,5 +29,15 @@ export function Live({ matchId, expiresAt }: { matchId: string; expiresAt?: stri
     return () => clearInterval(tick);
   }, [expiresAt, matchId]);
 
-  return expiresAt && left != null ? <p style={{ fontSize: 24 }}>⏱️ {left} s</p> : null;
+  if (!expiresAt || left == null) return null;
+  // Barre de temps du quiz : se vide de 100 % à 0 %, rouge dans les 5 dernières secondes
+  const pct = Math.min(100, (left / totalSeconds) * 100);
+  return (
+    <div className="grid w-full max-w-md gap-1" role="timer" aria-label={`${left} secondes restantes`}>
+      <div className="h-2 overflow-hidden rounded-full bg-muted">
+        <div className={cn("h-full rounded-full transition-all duration-300", left <= 5 ? "bg-red-500" : "bg-ring")} style={{ width: `${pct}%` }} />
+      </div>
+      <p className="text-center text-sm font-semibold tabular-nums">{left} s</p>
+    </div>
+  );
 }

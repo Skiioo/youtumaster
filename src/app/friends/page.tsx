@@ -1,4 +1,5 @@
-import { Check, Search, UserMinus, UserPlus, X } from "lucide-react";
+import Link from "next/link";
+import { Check, Search, Swords, UserMinus, UserPlus, X } from "lucide-react";
 import type { ReactNode } from "react";
 import { PageTitle } from "@/components/PageTitle";
 import { Button } from "@/components/ui/button";
@@ -128,7 +129,15 @@ export default async function FriendsPage({ searchParams }: PageProps<"/friends"
             {friends.length ? (
               <ul className="divide-y">
                 {friends.map((p) =>
-                  row(p, act(removeFriend, p.id, <Button type="submit" variant="ghost" size="sm"><UserMinus /> Retirer</Button>)),
+                  row(
+                    p,
+                    <>
+                      <Button size="sm" variant="outline" nativeButton={false} render={<Link href={`/play?invite=${p.id}#create`} />}>
+                        <Swords /> Défier
+                      </Button>
+                      {act(removeFriend, p.id, <Button type="submit" variant="ghost" size="sm"><UserMinus /> Retirer</Button>)}
+                    </>,
+                  ),
                 )}
               </ul>
             ) : (
